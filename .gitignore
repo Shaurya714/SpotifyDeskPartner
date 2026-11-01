@@ -1,0 +1,22 @@
+# Python environment
+.venv/
+__pycache__/
+*.pyc
+
+# Credentials
+.env
+**/.env
+firmware/include/secrets.h
+
+# Spotify authentication
+bridge/.spotify_cache*
+
+# VS Code
+.vscode/
+
+# PlatformIO generated files
+.pio/
+firmware/.pio/
+
+# Build artifacts
+build/
