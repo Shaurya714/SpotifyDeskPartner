@@ -19,13 +19,13 @@ const unsigned long POLL_INTERVAL = 1000;
 const unsigned long DISPLAY_INTERVAL = 50;
 
 // Marquee settings
-const unsigned long SCROLL_INTERVAL = 30;
+const float SCROLL_SPEED = 35.0f;
 const int SCROLL_GAP = 28;
 
 unsigned long lastPollTime = 0;
 unsigned long lastDisplayTime = 0;
-unsigned long lastScrollTime = 0;
 unsigned long lastClockUpdate = 0;
+unsigned long lastScrollTime = 0;
 
 // Playback state
 String trackTitle = "Waiting for Spotify...";
@@ -38,7 +38,7 @@ long durationMs = 0;
 long progressMs = 0;
 
 // Marquee state
-int titleScrollX = 0;
+float titleScrollX = 0.0f;
 
 // Clock and greeting
 String greeting = "Hello, music lover";
@@ -142,14 +142,15 @@ void fetchPlaybackData() {
                 durationMs = 0;
                 progressMs = 0;
 
-                titleScrollX = 0;
+                titleScrollX = 0.0f;
+                lastScrollTime = millis();
             }
             else {
                 String newTitle = track["title"] | "Unknown Track";
 
                 // Reset marquee when the track changes
                 if (newTitle != trackTitle) {
-                    titleScrollX = 0;
+                    titleScrollX = 0.0f;
                     lastScrollTime = millis();
                 }
 
@@ -186,30 +187,38 @@ void fetchPlaybackData() {
     http.end();
 }
 
-// Update marquee position
+// Update marquee position using elapsed time
 void updateTitleScroll(int titleWidth) {
     const int screenWidth = 128;
 
-    // Short titles do not need scrolling
+    // Short titles remain stationary
     if (titleWidth <= screenWidth) {
-        titleScrollX = 0;
+        titleScrollX = 0.0f;
+        lastScrollTime = millis();
         return;
     }
 
     unsigned long currentTime = millis();
 
-    if (currentTime - lastScrollTime >= SCROLL_INTERVAL) {
+    if (lastScrollTime == 0) {
+        lastScrollTime = currentTime;
+        return;
+    }
 
-        // Account for elapsed time so scrolling stays consistent
-        unsigned long steps =
-            (currentTime - lastScrollTime) / SCROLL_INTERVAL;
+    // Calculate elapsed time in seconds
+    float deltaTime =
+        (currentTime - lastScrollTime) / 1000.0f;
 
-        int cycleWidth = titleWidth + SCROLL_GAP;
+    lastScrollTime = currentTime;
 
-        titleScrollX =
-            (titleScrollX + steps) % cycleWidth;
+    // Move title according to configured speed
+    titleScrollX += SCROLL_SPEED * deltaTime;
 
-        lastScrollTime += steps * SCROLL_INTERVAL;
+    // Loop continuously with a gap between repetitions
+    float cycleWidth = titleWidth + SCROLL_GAP;
+
+    if (titleScrollX >= cycleWidth) {
+        titleScrollX -= cycleWidth;
     }
 }
 
@@ -234,7 +243,7 @@ void drawDisplay() {
         u8g2.drawStr(0, 48, "Check laptop server");
     }
     else {
-        // Track title with continuous marquee
+        // Track title
         u8g2.setFont(u8g2_font_7x14B_tf);
 
         int titleWidth = u8g2.getStrWidth(trackTitle.c_str());
@@ -242,20 +251,19 @@ void drawDisplay() {
         updateTitleScroll(titleWidth);
 
         if (titleWidth <= 128) {
-            // Keep short titles stationary
             u8g2.drawStr(0, 31, trackTitle.c_str());
         }
         else {
-            // First copy
+            // First title copy
             u8g2.drawStr(
-                -titleScrollX,
+                -(int)titleScrollX,
                 31,
                 trackTitle.c_str()
             );
 
-            // Second copy with a gap for continuous repetition
+            // Second title copy
             u8g2.drawStr(
-                -titleScrollX + titleWidth + SCROLL_GAP,
+                -(int)titleScrollX + titleWidth + SCROLL_GAP,
                 31,
                 trackTitle.c_str()
             );
@@ -331,14 +339,14 @@ void drawDisplay() {
         );
 
         // Playback status
-        String status = isPlaying ? "PLAYING" : "PAUSED";
+        const char* status = isPlaying ? "PLAYING" : "PAUSED";
 
-        int statusWidth = u8g2.getStrWidth(status.c_str());
+        int statusWidth = u8g2.getStrWidth(status);
 
         u8g2.drawStr(
             (128 - statusWidth) / 2,
             63,
-            status.c_str()
+            status
         );
     }
 
@@ -352,11 +360,9 @@ void setup() {
 
     // Initial loading screen
     u8g2.clearBuffer();
-
     u8g2.setFont(u8g2_font_6x10_tf);
 
     const char* loadingText = "Spotify Loading...";
-
     int loadingWidth = u8g2.getStrWidth(loadingText);
 
     u8g2.drawStr(
@@ -387,19 +393,19 @@ void setup() {
 void loop() {
     unsigned long currentTime = millis();
 
-    // Poll Spotify bridge
+    // Spotify bridge polling
     if (currentTime - lastPollTime >= POLL_INTERVAL) {
         lastPollTime = currentTime;
         fetchPlaybackData();
     }
 
-    // Update clock once per second
+    // Clock update
     if (currentTime - lastClockUpdate >= 1000) {
         lastClockUpdate = currentTime;
         updateClock();
     }
 
-    // Refresh OLED display
+    // OLED refresh
     if (currentTime - lastDisplayTime >= DISPLAY_INTERVAL) {
         lastDisplayTime = currentTime;
         drawDisplay();
