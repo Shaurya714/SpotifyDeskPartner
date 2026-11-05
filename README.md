@@ -12,6 +12,7 @@ Spotify Desk Partner uses a Python bridge to communicate with the Spotify Web AP
 - Indicates whether playback is active or paused.
 - Uses a Python-based Spotify API bridge.
 - Communicates wirelessly between the computer and ESP32 over Wi-Fi.
+- Real time clock display 
 
 ## System Architecture
 
